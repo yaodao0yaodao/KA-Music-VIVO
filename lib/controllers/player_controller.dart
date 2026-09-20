@@ -109,7 +109,11 @@ class PlayerController extends ChangeNotifier {
   PlayerController(this._api, this._audioHandler) {
     unawaited(_restoreSettings());
     unawaited(_superLyric.registerPublisher());
-    _audioHandler.attachTransportControls(onNext: next, onPrevious: previous);
+    _audioHandler.attachTransportControls(
+      onNext: next,
+      onPrevious: previous,
+      onPlaySong: (song, browseQueue) => playSong(song, queue: browseQueue),
+    );
     _desktopLyrics.setVisibilityChangedHandler(_handleDesktopLyricsVisibility);
     _positionSub = audioPlayer.positionStream.listen((value) {
       if (!_isSeeking) {
@@ -204,6 +208,7 @@ class PlayerController extends ChangeNotifier {
   // 避免歌词高亮和卡拉OK进度出现回跳。seek/换歌的大跨度回退会重建基线。
   Duration _lastSmoothPosition = Duration.zero;
   final _random = math.Random();
+
   /// 高潮试听结束时间（播放到该时间自动暂停）。
   Duration? _climaxEndTime;
 
@@ -368,6 +373,24 @@ class PlayerController extends ChangeNotifier {
     _saveQueueState();
     notifyListeners();
     return playbackMode;
+  }
+
+  int get vivoLoopMode => switch (playbackMode) {
+    PlaybackMode.playlistLoop => 1,
+    PlaybackMode.singleLoop => 2,
+    PlaybackMode.shuffle => 3,
+  };
+
+  void setVivoLoopMode(int mode) {
+    final next = switch (mode) {
+      2 => PlaybackMode.singleLoop,
+      3 => PlaybackMode.shuffle,
+      _ => PlaybackMode.playlistLoop,
+    };
+    if (playbackMode == next) return;
+    playbackMode = next;
+    _saveQueueState();
+    notifyListeners();
   }
 
   Future<void> setAddListeningTimeEnabled(bool enabled) async {
@@ -755,7 +778,8 @@ class PlayerController extends ChangeNotifier {
   }
 
   /// 车载蓝牙歌词功能是否受支持（仅 Android）。
-  bool get isBluetoothLyricsSupported => BluetoothLyricsService.isSupportedPlatform;
+  bool get isBluetoothLyricsSupported =>
+      BluetoothLyricsService.isSupportedPlatform;
 
   /// 开关车载蓝牙歌词功能。
   Future<void> setBluetoothLyricsEnabled(bool enabled) async {
@@ -1321,19 +1345,21 @@ class PlayerController extends ChangeNotifier {
           final addedDevices = devices.difference(_previousDevices!);
           if (addedDevices.isNotEmpty) {
             // ignore: experimental_member_use
-            final hasNewAudioDevice = addedDevices.any((d) =>
-                // ignore: experimental_member_use
-                d.type == AudioDeviceType.bluetoothA2dp ||
-                // ignore: experimental_member_use
-                d.type == AudioDeviceType.bluetoothLe ||
-                // ignore: experimental_member_use
-                d.type == AudioDeviceType.bluetoothSco ||
-                // ignore: experimental_member_use
-                d.type == AudioDeviceType.wiredHeadset ||
-                // ignore: experimental_member_use
-                d.type == AudioDeviceType.wiredHeadphones ||
-                // ignore: experimental_member_use
-                d.type == AudioDeviceType.carAudio);
+            final hasNewAudioDevice = addedDevices.any(
+              (d) =>
+                  // ignore: experimental_member_use
+                  d.type == AudioDeviceType.bluetoothA2dp ||
+                  // ignore: experimental_member_use
+                  d.type == AudioDeviceType.bluetoothLe ||
+                  // ignore: experimental_member_use
+                  d.type == AudioDeviceType.bluetoothSco ||
+                  // ignore: experimental_member_use
+                  d.type == AudioDeviceType.wiredHeadset ||
+                  // ignore: experimental_member_use
+                  d.type == AudioDeviceType.wiredHeadphones ||
+                  // ignore: experimental_member_use
+                  d.type == AudioDeviceType.carAudio,
+            );
 
             if (hasNewAudioDevice &&
                 autoPlayOnDeviceConnected &&
@@ -1514,8 +1540,11 @@ class PlayerController extends ChangeNotifier {
       _lastSuperLyricPlaying = true;
       final clampedIndex = index.clamp(0, lyrics.length - 1);
       final line = lyrics[clampedIndex];
-      final lineEndTime = line.time +
-          (line.duration ?? _estimatedLineDuration(clampedIndex) ?? Duration.zero);
+      final lineEndTime =
+          line.time +
+          (line.duration ??
+              _estimatedLineDuration(clampedIndex) ??
+              Duration.zero);
       unawaited(
         _superLyric.sendLyric(
           song: currentSong!,
@@ -1820,8 +1849,7 @@ class PlayerController extends ChangeNotifier {
         prefs.getBool(_listenTimeSettingKey) ?? addListeningTimeEnabled;
     keepScreenOnEnabled =
         prefs.getBool(_keepScreenOnSettingKey) ?? keepScreenOnEnabled;
-    lyricBlurEnabled =
-        prefs.getBool(_lyricBlurSettingKey) ?? lyricBlurEnabled;
+    lyricBlurEnabled = prefs.getBool(_lyricBlurSettingKey) ?? lyricBlurEnabled;
     audioQuality = AudioQuality.fromApiValue(
       prefs.getString(_audioQualitySettingKey),
     );
@@ -1858,7 +1886,7 @@ class PlayerController extends ChangeNotifier {
         volumeNormalizationEnabled;
     bluetoothLyricsEnabled =
         prefs.getBool(_bluetoothLyricsEnabledSettingKey) ??
-            bluetoothLyricsEnabled;
+        bluetoothLyricsEnabled;
     playbackSpeed = prefs.getDouble(_playbackSpeedSettingKey) ?? playbackSpeed;
     desktopLyricsEnabled =
         prefs.getBool(_desktopLyricsEnabledSettingKey) ?? desktopLyricsEnabled;
@@ -2270,7 +2298,10 @@ class PlayerController extends ChangeNotifier {
       await prefs.remove(_currentSongKey);
       await prefs.remove(_currentPositionKey);
     }
-    await prefs.setString(_queueKey, jsonEncode(queue.map((s) => s.toCache()).toList()));
+    await prefs.setString(
+      _queueKey,
+      jsonEncode(queue.map((s) => s.toCache()).toList()),
+    );
     await prefs.setString(_playbackModeKey, playbackMode.name);
   }
 

@@ -45,7 +45,12 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.hoilai.mm.music"
+        // vivo MusicWidgetMix additionally gates Atomic Island by an internal
+        // package allowlist. Keep the normal KA id by default, but allow a
+        // dedicated compatibility APK to use a vendor-recognised id without
+        // changing the Kotlin namespace or MethodChannel names.
+        applicationId = providers.gradleProperty("kaApplicationId")
+            .getOrElse("com.hoilai.mm.music")
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         // 不能用 flutter.minSdkVersion（CI 的 Flutter 3.47.1 解析为 24）：
@@ -115,6 +120,10 @@ configurations.all {
 }
 
 dependencies {
+    // VivoAudioService subclasses audio_service's MediaBrowserServiceCompat-based
+    // service, so the superclass must also be visible on the app compile classpath.
+    implementation("androidx.media:media:1.7.0")
+
     // SuperLyricApi（https://github.com/HChenX/SuperLyricApi 3.4）
     // AAR 通过 JitPack 发布。JitPack 是"首次请求时才在服务器端懒构建"，
     // 所以把该依赖标记为 `changing = true`，配合上面的

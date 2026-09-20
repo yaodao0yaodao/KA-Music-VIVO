@@ -9,7 +9,10 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  audio_service: ^0.18.18
+  # Local Android compatibility patch: connect to our AudioService subclass so
+  # vivo's vendor bind action and the app share the exact same media session.
+  audio_service:
+    path: packages/audio_service
   audio_session: ^0.2.4
   http: ^1.5.0
   just_audio: ^0.10.4

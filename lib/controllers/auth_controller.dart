@@ -32,10 +32,14 @@ class AuthController extends ChangeNotifier {
   List<PlaylistSummary> playlists = const [];
 
   final Set<String> _likedHashes = {};
+  List<Song> _likedSongs = const [];
 
   bool get isLoggedIn => session?.isValid == true;
 
-  bool isLiked(Song song) => _likedHashes.contains(song.hash);
+  String _likeKey(Song song) =>
+      (song.hash.isNotEmpty ? song.hash : song.id).toLowerCase();
+
+  bool isLiked(Song song) => _likedHashes.contains(_likeKey(song));
 
   int get likedCount {
     final playlist = likedPlaylist;
@@ -46,31 +50,72 @@ class AuthController extends ChangeNotifier {
   }
 
   Future<void> toggleLike(Song song) async {
-    final playlist = likedPlaylist;
-    if (playlist == null) return;
+    await setLiked(song, !isLiked(song));
+  }
 
-    final liked = _likedHashes.contains(song.hash);
+  /// Set the exact heart state requested by an external media controller.
+  Future<void> setLiked(Song song, bool shouldLike) async {
+    var playlist = likedPlaylist;
+    if (playlist == null && isLoggedIn) {
+      playlists = await _loadUserPlaylistsWithCache();
+      playlist = likedPlaylist;
+    }
+    if (playlist == null) {
+      throw StateError('未找到用户的收藏歌单');
+    }
+
+    final key = _likeKey(song);
+    final liked = _likedHashes.contains(key);
+    if (liked == shouldLike) return;
     final targetListId = playlist.listId?.isNotEmpty == true
         ? playlist.listId!
         : playlist.id;
+    final previousSongs = _likedSongs;
     try {
-      if (liked) {
+      if (!shouldLike) {
         await _api.removeFromPlaylist(targetListId, song);
-        _likedHashes.remove(song.hash);
+        _likedHashes.remove(key);
+        _likedSongs = _likedSongs
+            .where((item) => _likeKey(item) != key)
+            .toList(growable: false);
       } else {
         await _api.addToPlaylist(targetListId, song);
-        _likedHashes.add(song.hash);
+        _likedHashes.add(key);
+        if (!_likedSongs.any((item) => _likeKey(item) == key)) {
+          _likedSongs = List<Song>.unmodifiable([song, ..._likedSongs]);
+        }
       }
       await _persistLikedHashes();
       notifyListeners();
     } catch (error) {
-      // Revert on failure
       if (liked) {
-        _likedHashes.add(song.hash);
+        _likedHashes.add(key);
       } else {
-        _likedHashes.remove(song.hash);
+        _likedHashes.remove(key);
       }
+      _likedSongs = previousSongs;
       rethrow;
+    }
+  }
+
+  Future<List<Song>> likedSongsPage(int page, int pageSize) async {
+    var playlist = likedPlaylist;
+    if (playlist == null && isLoggedIn) {
+      playlists = await _loadUserPlaylistsWithCache();
+      playlist = likedPlaylist;
+    }
+    if (playlist == null) return const [];
+    try {
+      return await _api.playlistSongs(
+        playlist.id,
+        page: page + 1,
+        pageSize: pageSize,
+      );
+    } catch (_) {
+      return _likedSongs
+          .skip(page * pageSize)
+          .take(pageSize)
+          .toList(growable: false);
     }
   }
 
@@ -166,7 +211,10 @@ class AuthController extends ChangeNotifier {
       await _api.addToPlaylist(listId, song);
       playlists = await _loadUserPlaylistsWithCache();
       if (playlist.isLikedPlaylist) {
-        _likedHashes.add(song.hash);
+        _likedHashes.add(_likeKey(song));
+        if (!_likedSongs.any((item) => _likeKey(item) == _likeKey(song))) {
+          _likedSongs = List<Song>.unmodifiable([song, ..._likedSongs]);
+        }
         await _persistLikedHashes();
       }
     });
@@ -183,7 +231,11 @@ class AuthController extends ChangeNotifier {
       await _api.removeFromPlaylist(listId, song);
       playlists = await _loadUserPlaylistsWithCache();
       if (target.isLikedPlaylist) {
-        _likedHashes.remove(song.hash);
+        final key = _likeKey(song);
+        _likedHashes.remove(key);
+        _likedSongs = _likedSongs
+            .where((item) => _likeKey(item) != key)
+            .toList(growable: false);
         await _persistLikedHashes();
       }
     });
@@ -395,6 +447,7 @@ class AuthController extends ChangeNotifier {
         profile = null;
         playlists = const [];
         _likedHashes.clear();
+        _likedSongs = const [];
         _api.setSession(null);
         await prefs.remove(_tokenKey);
         await prefs.remove(_t1Key);
@@ -410,13 +463,17 @@ class AuthController extends ChangeNotifier {
 
   Future<void> _syncLikedSongs() async {
     final playlist = likedPlaylist;
-    if (playlist == null) return;
+    if (playlist == null) {
+      _likedSongs = const [];
+      return;
+    }
 
     try {
       final songs = await _api.playlistSongs(playlist.id, fetchAll: true);
+      _likedSongs = List<Song>.unmodifiable(songs);
       _likedHashes.clear();
       for (final song in songs) {
-        _likedHashes.add(song.hash);
+        _likedHashes.add(_likeKey(song));
       }
       await _persistLikedHashes();
     } catch (_) {
@@ -436,7 +493,9 @@ class AuthController extends ChangeNotifier {
     try {
       final list = jsonDecode(raw);
       if (list is List) {
-        _likedHashes.addAll(list.whereType<String>());
+        _likedHashes.addAll(
+          list.whereType<String>().map((value) => value.toLowerCase()),
+        );
       }
     } catch (_) {}
   }
@@ -531,6 +590,7 @@ class AuthController extends ChangeNotifier {
     profile = null;
     playlists = const [];
     _likedHashes.clear();
+    _likedSongs = const [];
     _api.setSession(null);
     await prefs.remove(_tokenKey);
     await prefs.remove(_t1Key);

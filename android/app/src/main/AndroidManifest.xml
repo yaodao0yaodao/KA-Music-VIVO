@@ -19,6 +19,16 @@
         android:usesCleartextTraffic="true"
         android:requestLegacyExternalStorage="true"
         android:icon="@mipmap/ic_launcher">
+        <!-- vivo 原子随身听合作应用声明。控制能力由下方 VivoAudioService 提供。 -->
+        <meta-data
+            android:name="support_vivo_musicwidgetmix_value"
+            android:value="1001" />
+        <meta-data
+            android:name="support_vivo_musicwidgetmix_token"
+            android:value="81ed19dacbe2c11fa52a129e3815037c62abc5aee1d5a39f9240c35a09e07eb2" />
+        <meta-data
+            android:name="support_vivo_musicwidgetmix_logo_color"
+            android:value="\#FF5C9D\#FFFFFF" />
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -42,12 +52,15 @@
             </intent-filter>
         </activity>
         <service
-            android:name="com.ryanheise.audioservice.AudioService"
+            android:name=".VivoAudioService"
             android:foregroundServiceType="mediaPlayback"
             android:exported="true"
             tools:ignore="Instantiatable">
             <intent-filter>
                 <action android:name="android.media.browse.MediaBrowserService" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="com.vivo.musicwidgetmix.support.service" />
             </intent-filter>
         </service>
         <receiver

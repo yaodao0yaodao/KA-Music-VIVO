@@ -15,6 +15,9 @@ class AboutPage extends StatefulWidget {
   const AboutPage({super.key, required this.api});
 
   static final Uri _repositoryUri = Uri.parse(
+    'https://github.com/yaodao0yaodao/kgka_Music_hl',
+  );
+  static final Uri _upstreamUri = Uri.parse(
     'https://github.com/umr-xiaomai/kgka_Music_hl',
   );
 
@@ -50,11 +53,8 @@ class _AboutPageState extends State<AboutPage> {
     }
   }
 
-  Future<void> _openRepository(BuildContext context) async {
-    final opened = await launchUrl(
-      AboutPage._repositoryUri,
-      mode: LaunchMode.externalApplication,
-    );
+  Future<void> _openUri(Uri uri) async {
+    final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
     if (!opened) {
       Toast.error('无法打开 GitHub 仓库链接');
     }
@@ -75,132 +75,144 @@ class _AboutPageState extends State<AboutPage> {
                 surfaceTintColor: Colors.transparent,
                 backgroundColor: Colors.transparent,
               ),
-            SliverToBoxAdapter(
-              child: Column(
-                children: [
-                  const SizedBox(height: 12),
-                  _AppLogo(),
-                  const SizedBox(height: 16),
-                  Text(
-                    AppConfig.appName,
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    '版本 ${AppConfig.appVersion}',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '一个专注播放体验的音乐应用。',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 22),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: AppUpdateService.isSupportedPlatform
-                              ? FilledButton.icon(
-                                  onPressed: () => checkAppUpdateManually(
-                                    context: context,
-                                    api: widget.api,
-                                  ),
-                                  icon: const Icon(
-                                    Icons.system_update_alt_rounded,
-                                  ),
-                                  label: const Text('检查更新'),
-                                )
-                              : OutlinedButton.icon(
-                                  onPressed: null,
-                                  icon: const Icon(
-                                    Icons.system_update_alt_rounded,
-                                  ),
-                                  label: const Text('暂不支持检查更新'),
-                                ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(22, 18, 22, 8),
-                child: _InfoSection(
+              SliverToBoxAdapter(
+                child: Column(
                   children: [
-                    const _InfoRow(label: '应用名称', value: AppConfig.appName),
-                    const _InfoRow(label: '当前版本', value: AppConfig.appVersion),
-                    const _InfoRow(
-                      label: '作者',
-                      value: '小埋-XiaoMai，其他Github开发者',
+                    const SizedBox(height: 12),
+                    _AppLogo(),
+                    const SizedBox(height: 16),
+                    Text(
+                      AppConfig.appName,
+                      style: Theme.of(context).textTheme.headlineSmall
+                          ?.copyWith(fontWeight: FontWeight.w900),
                     ),
-                    _InfoRow(
-                      label: '服务地址',
-                      value: AppConfig.hasCustomBaseUrl
-                          ? AppConfig.customBaseUrl!
-                          : AppConfig.apiBaseUrl,
+                    const SizedBox(height: 6),
+                    Text(
+                      '版本 ${AppConfig.appVersion} · VIVO 兼容版',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                    _InfoLinkRow(
-                      label: 'GitHub',
-                      value: 'umr-xiaomai/kgka_Music_hl',
-                      onTap: () => _openRepository(context),
+                    const SizedBox(height: 8),
+                    Text(
+                      '专为 VIVO OriginOS 原子随身听适配。',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 22),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: AppUpdateService.isSupportedPlatform
+                                ? FilledButton.icon(
+                                    onPressed: () => checkAppUpdateManually(
+                                      context: context,
+                                      api: widget.api,
+                                    ),
+                                    icon: const Icon(
+                                      Icons.system_update_alt_rounded,
+                                    ),
+                                    label: const Text('检查更新'),
+                                  )
+                                : OutlinedButton.icon(
+                                    onPressed: null,
+                                    icon: const Icon(
+                                      Icons.system_update_alt_rounded,
+                                    ),
+                                    label: const Text('暂不支持检查更新'),
+                                  ),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
               ),
-            ),
-            if (_changelogLoaded && _versions.isNotEmpty) ...[
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(22, 24, 22, 8),
-                  child: Row(
+                  padding: const EdgeInsets.fromLTRB(22, 18, 22, 8),
+                  child: _InfoSection(
                     children: [
-                      Icon(
-                        Icons.history_rounded,
-                        size: 20,
-                        color: colorScheme.primary,
+                      const _InfoRow(label: '应用名称', value: AppConfig.appName),
+                      const _InfoRow(
+                        label: '当前版本',
+                        value: AppConfig.appVersion,
                       ),
-                      const SizedBox(width: 8),
-                      Text(
-                        '更新日志',
-                        style: Theme.of(context).textTheme.titleMedium
-                            ?.copyWith(fontWeight: FontWeight.w800),
+                      const _InfoRow(label: '版本类型', value: 'VIVO 原子随身听兼容版'),
+                      const _InfoRow(
+                        label: '兼容包名',
+                        value: 'com.apple.android.music',
+                      ),
+                      const _InfoRow(
+                        label: '作者',
+                        value: '小埋-XiaoMai，其他Github开发者',
+                      ),
+                      _InfoRow(
+                        label: '服务地址',
+                        value: AppConfig.hasCustomBaseUrl
+                            ? AppConfig.customBaseUrl!
+                            : AppConfig.apiBaseUrl,
+                      ),
+                      _InfoLinkRow(
+                        label: '维护仓库',
+                        value: 'yaodao0yaodao/kgka_Music_hl (vivo)',
+                        onTap: () => _openUri(AboutPage._repositoryUri),
+                      ),
+                      _InfoLinkRow(
+                        label: '上游项目',
+                        value: 'umr-xiaomai/kgka_Music_hl',
+                        onTap: () => _openUri(AboutPage._upstreamUri),
                       ),
                     ],
                   ),
                 ),
               ),
-              SliverPadding(
-                padding: const EdgeInsets.symmetric(horizontal: 22),
-                sliver: SliverList.separated(
-                  itemCount: _versions.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 10),
-                  itemBuilder: (context, index) {
-                    final version = _versions[index];
-                    return _VersionCard(
-                      version: version,
-                      initiallyExpanded: index == 0,
-                    );
-                  },
+              if (_changelogLoaded && _versions.isNotEmpty) ...[
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(22, 24, 22, 8),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.history_rounded,
+                          size: 20,
+                          color: colorScheme.primary,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '更新日志',
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w800),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
-              const SliverToBoxAdapter(child: SizedBox(height: 32)),
-            ] else if (_changelogLoaded) ...[
-              const SliverToBoxAdapter(child: SizedBox(height: 32)),
+                SliverPadding(
+                  padding: const EdgeInsets.symmetric(horizontal: 22),
+                  sliver: SliverList.separated(
+                    itemCount: _versions.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 10),
+                    itemBuilder: (context, index) {
+                      final version = _versions[index];
+                      return _VersionCard(
+                        version: version,
+                        initiallyExpanded: index == 0,
+                      );
+                    },
+                  ),
+                ),
+                const SliverToBoxAdapter(child: SizedBox(height: 32)),
+              ] else if (_changelogLoaded) ...[
+                const SliverToBoxAdapter(child: SizedBox(height: 32)),
+              ],
             ],
-          ],
+          ),
         ),
-      ),
       ),
     );
   }
@@ -382,93 +394,91 @@ class _VersionCardState extends State<_VersionCard> {
         child: InkWell(
           onTap: () => setState(() => _expanded = !_expanded),
           child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isCurrent
+                            ? colorScheme.primary
+                            : colorScheme.primary.withValues(alpha: .12),
+                        borderRadius: BorderRadius.circular(AppRadius.sm),
+                      ),
+                      child: Text(
+                        version.version,
+                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
                           color: isCurrent
-                              ? colorScheme.primary
-                              : colorScheme.primary.withValues(alpha: .12),
-                          borderRadius: BorderRadius.circular(AppRadius.sm),
-                        ),
-                        child: Text(
-                          version.version,
-                          style: Theme.of(context).textTheme.labelLarge
-                              ?.copyWith(
-                                color: isCurrent
-                                    ? colorScheme.onPrimary
-                                    : colorScheme.primary,
-                                fontWeight: FontWeight.w800,
-                              ),
+                              ? colorScheme.onPrimary
+                              : colorScheme.primary,
+                          fontWeight: FontWeight.w800,
                         ),
                       ),
-                      if (version.date != null) ...[
-                        const SizedBox(width: 10),
-                        Text(
-                          version.date!,
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(color: colorScheme.onSurfaceVariant),
-                        ),
-                      ],
-                      const Spacer(),
-                      AnimatedRotation(
-                        turns: _expanded ? 0.25 : 0,
-                        duration: const Duration(milliseconds: 180),
-                        child: Icon(
-                          Icons.chevron_right_rounded,
-                          color: colorScheme.outline,
+                    ),
+                    if (version.date != null) ...[
+                      const SizedBox(width: 10),
+                      Text(
+                        version.date!,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
                         ),
                       ),
                     ],
-                  ),
-                ),
-                AnimatedCrossFade(
-                  duration: const Duration(milliseconds: 180),
-                  crossFadeState: _expanded
-                      ? CrossFadeState.showSecond
-                      : CrossFadeState.showFirst,
-                  firstChild: const SizedBox(width: double.infinity),
-                  secondChild: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Divider(
-                          height: 1,
-                          color: colorScheme.outlineVariant.withValues(
-                            alpha: .4,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        if (version.lines.isEmpty)
-                          Text(
-                            '暂无更新说明',
-                            style: Theme.of(context).textTheme.bodyMedium
-                                ?.copyWith(color: colorScheme.onSurfaceVariant),
-                          )
-                        else
-                          ...version.lines.map(
-                            (line) => _ChangelogLine(text: line),
-                          ),
-                      ],
+                    const Spacer(),
+                    AnimatedRotation(
+                      turns: _expanded ? 0.25 : 0,
+                      duration: const Duration(milliseconds: 180),
+                      child: Icon(
+                        Icons.chevron_right_rounded,
+                        color: colorScheme.outline,
+                      ),
                     ),
+                  ],
+                ),
+              ),
+              AnimatedCrossFade(
+                duration: const Duration(milliseconds: 180),
+                crossFadeState: _expanded
+                    ? CrossFadeState.showSecond
+                    : CrossFadeState.showFirst,
+                firstChild: const SizedBox(width: double.infinity),
+                secondChild: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Divider(
+                        height: 1,
+                        color: colorScheme.outlineVariant.withValues(alpha: .4),
+                      ),
+                      const SizedBox(height: 10),
+                      if (version.lines.isEmpty)
+                        Text(
+                          '暂无更新说明',
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(color: colorScheme.onSurfaceVariant),
+                        )
+                      else
+                        ...version.lines.map(
+                          (line) => _ChangelogLine(text: line),
+                        ),
+                    ],
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
-      );
-    }
+      ),
+    );
   }
+}
 
 class _ChangelogLine extends StatelessWidget {
   const _ChangelogLine({required this.text});

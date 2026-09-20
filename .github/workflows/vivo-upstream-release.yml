@@ -1,0 +1,137 @@
+name: Sync upstream and release VIVO APK
+
+on:
+  schedule:
+    # GitHub schedules use UTC. Run daily at 03:17 UTC (11:17 China time).
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+    inputs:
+      force_release:
+        description: Rebuild the latest upstream release even if it already exists
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+concurrency:
+  group: vivo-upstream-release
+  cancel-in-progress: false
+
+env:
+  UPSTREAM_REPOSITORY: umr-xiaomai/kgka_Music_hl
+  VIVO_BRANCH: vivo
+  APK_NAME: KA-Music-vivo-atomic-arm64.apk
+
+jobs:
+  sync-build-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout VIVO branch
+        uses: actions/checkout@v4
+        with:
+          ref: vivo
+          fetch-depth: 0
+          lfs: true
+
+      - name: Detect latest upstream release
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FORCE_RELEASE: ${{ inputs.force_release || false }}
+        run: |
+          set -euo pipefail
+          latest="$(gh api "repos/${UPSTREAM_REPOSITORY}/releases/latest" --jq .tag_name)"
+          vivo_tag="vivo-${latest}"
+          echo "upstream_tag=${latest}" >> "$GITHUB_OUTPUT"
+          echo "vivo_tag=${vivo_tag}" >> "$GITHUB_OUTPUT"
+          if gh release view "$vivo_tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 \
+            && [ "$FORCE_RELEASE" != "true" ]; then
+            echo "needed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "needed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Merge upstream release into VIVO branch
+        if: steps.release.outputs.needed == 'true'
+        env:
+          UPSTREAM_TAG: ${{ steps.release.outputs.upstream_tag }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote add upstream "https://github.com/${UPSTREAM_REPOSITORY}.git"
+          git fetch upstream "refs/tags/${UPSTREAM_TAG}:refs/tags/upstream-${UPSTREAM_TAG}"
+          git merge --no-edit "refs/tags/upstream-${UPSTREAM_TAG}"
+          git push origin "HEAD:${VIVO_BRANCH}"
+
+      - name: Set up Flutter
+        if: steps.release.outputs.needed == 'true'
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Restore Android signing key
+        if: steps.release.outputs.needed == 'true'
+        env:
+          VIVO_KEYSTORE_BASE64: ${{ secrets.VIVO_KEYSTORE_BASE64 }}
+          VIVO_STORE_PASSWORD: ${{ secrets.VIVO_STORE_PASSWORD }}
+          VIVO_KEY_ALIAS: ${{ secrets.VIVO_KEY_ALIAS }}
+          VIVO_KEY_PASSWORD: ${{ secrets.VIVO_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$VIVO_KEYSTORE_BASE64"
+          printf '%s' "$VIVO_KEYSTORE_BASE64" | base64 --decode > android/app/vivo-release.jks
+          {
+            echo 'storeFile=app/vivo-release.jks'
+            echo "storePassword=${VIVO_STORE_PASSWORD}"
+            echo "keyAlias=${VIVO_KEY_ALIAS}"
+            echo "keyPassword=${VIVO_KEY_PASSWORD}"
+          } > android/key.properties
+
+      - name: Install dependencies and run tests
+        if: steps.release.outputs.needed == 'true'
+        run: |
+          flutter config --no-analytics
+          flutter pub get
+          flutter test
+
+      - name: Build VIVO compatibility APK
+        if: steps.release.outputs.needed == 'true'
+        run: |
+          set -euo pipefail
+          build() {
+            flutter build apk --release \
+              --target-platform android-arm64 \
+              --android-project-arg=kaApplicationId=com.apple.android.music
+          }
+          build || { sleep 90; build; }
+          cp build/app/outputs/flutter-apk/app-release.apk "$APK_NAME"
+
+      - name: Publish VIVO release
+        if: steps.release.outputs.needed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          UPSTREAM_TAG: ${{ steps.release.outputs.upstream_tag }}
+          VIVO_TAG: ${{ steps.release.outputs.vivo_tag }}
+        run: |
+          set -euo pipefail
+          notes="VIVO OriginOS 原子随身听兼容版，已合并上游 ${UPSTREAM_TAG}。
+
+          - 兼容包名：\`com.apple.android.music\`
+          - 架构：arm64-v8a
+          - 上游发布：https://github.com/${UPSTREAM_REPOSITORY}/releases/tag/${UPSTREAM_TAG}
+
+          注意：不能与 Android Apple Music 同时安装。"
+          if gh release view "$VIVO_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$VIVO_TAG" "$APK_NAME" --clobber --repo "$GITHUB_REPOSITORY"
+            gh release edit "$VIVO_TAG" --notes "$notes" --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create "$VIVO_TAG" "$APK_NAME" \
+              --target "$VIVO_BRANCH" \
+              --title "KA Music ${UPSTREAM_TAG} VIVO 兼容版" \
+              --notes "$notes" \
+              --repo "$GITHUB_REPOSITORY"
+          fi

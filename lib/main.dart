@@ -43,12 +43,14 @@ Future<void> main() async {
   await themeController.detectAutomotive(const DeviceInfoService());
   await themeController.load();
 
-  runApp(KaMusicApp(
-    client: client,
-    api: api,
-    audioHandler: audioHandler,
-    themeController: themeController,
-  ));
+  runApp(
+    KaMusicApp(
+      client: client,
+      api: api,
+      audioHandler: audioHandler,
+      themeController: themeController,
+    ),
+  );
 }
 
 class KaMusicApp extends StatefulWidget {
@@ -95,6 +97,17 @@ class _KaMusicAppState extends State<KaMusicApp> with WidgetsBindingObserver {
       ..downloadController = _downloads
       ..cacheService = _cacheService
       ..localMusic = _localMusic;
+    widget.audioHandler.attachVivoIntegration(
+      isLiked: _auth.isLiked,
+      onSetLike: _auth.setLiked,
+      getFavoriteSongs: _auth.likedSongsPage,
+      getDownloadedSongs: () => _downloads.downloadedSongs,
+      getLoopMode: () => _player.vivoLoopMode,
+      onSetLoopMode: _player.setVivoLoopMode,
+    );
+    void syncVivoMetadata() => widget.audioHandler.refreshVivoMetadata();
+    _auth.addListener(syncVivoMetadata);
+    _player.addListener(syncVivoMetadata);
     _theme = widget.themeController;
     _auth.restore();
     _downloads.initialize();
@@ -197,7 +210,9 @@ class _KaMusicAppState extends State<KaMusicApp> with WidgetsBindingObserver {
               data: MediaQuery.of(context).copyWith(textScaler: textScaler),
               child: _AppBackground(
                 themeController: _theme,
-                child: _SystemUiOverlay(child: child ?? const SizedBox.shrink()),
+                child: _SystemUiOverlay(
+                  child: child ?? const SizedBox.shrink(),
+                ),
               ),
             );
           },

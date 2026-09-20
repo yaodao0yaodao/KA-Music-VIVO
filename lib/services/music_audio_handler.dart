@@ -7,7 +7,14 @@ import '../models/music_models.dart';
 
 class MusicAudioHandler extends BaseAudioHandler
     with QueueHandler, SeekHandler {
+  // vivo MusicWidgetMix EventType mask:
+  // 0x01f = transport/lyrics/progress, 0x040 = heart control,
+  // 0x080 = playback mode,
+  // 0x100 = current queue, 0x200 = favorites, 0x400 = downloaded songs.
+  static const int _vivoSupportEvents = 0x7df;
+
   MusicAudioHandler() {
+    ratingStyle.add(RatingStyle.heart);
     audioPlayer.playbackEventStream
         .map(_playbackStateForEvent)
         .pipe(playbackState);
@@ -17,20 +24,51 @@ class MusicAudioHandler extends BaseAudioHandler
 
   Future<void> Function()? _onNext;
   Future<void> Function()? _onPrevious;
+  Future<void> Function(Song song, List<Song> queue)? _onPlaySong;
+  bool Function(Song song)? _isLiked;
+  Future<void> Function(Song song, bool liked)? _onSetLike;
+  Future<List<Song>> Function(int page, int pageSize)? _getFavoriteSongs;
+  List<Song> Function()? _getDownloadedSongs;
+  int Function()? _getLoopMode;
+  void Function(int mode)? _onSetLoopMode;
+  final Map<String, List<Song>> _vivoBrowseQueues = {};
   int _queueIndex = 0;
   Song? _currentSong;
+  Duration? _resolvedDuration;
+  List<Song> _queueSongs = const [];
 
   void attachTransportControls({
     required Future<void> Function() onNext,
     required Future<void> Function() onPrevious,
+    Future<void> Function(Song song, List<Song> queue)? onPlaySong,
   }) {
     _onNext = onNext;
     _onPrevious = onPrevious;
+    _onPlaySong = onPlaySong;
+  }
+
+  void attachVivoIntegration({
+    required bool Function(Song song) isLiked,
+    required Future<void> Function(Song song, bool liked) onSetLike,
+    required Future<List<Song>> Function(int page, int pageSize)
+    getFavoriteSongs,
+    required List<Song> Function() getDownloadedSongs,
+    required int Function() getLoopMode,
+    required void Function(int mode) onSetLoopMode,
+  }) {
+    _isLiked = isLiked;
+    _onSetLike = onSetLike;
+    _getFavoriteSongs = getFavoriteSongs;
+    _getDownloadedSongs = getDownloadedSongs;
+    _getLoopMode = getLoopMode;
+    _onSetLoopMode = onSetLoopMode;
+    refreshVivoMetadata();
   }
 
   void detachTransportControls() {
     _onNext = null;
     _onPrevious = null;
+    _onPlaySong = null;
   }
 
   Future<void> loadSong({
@@ -40,6 +78,8 @@ class MusicAudioHandler extends BaseAudioHandler
     required int queueIndex,
   }) async {
     _currentSong = song;
+    _resolvedDuration = null;
+    _queueSongs = List<Song>.of(queueSongs);
     _queueIndex = queueIndex < 0 ? 0 : queueIndex;
     final currentItem = _mediaItemFor(song);
     final items = queueSongs.map(_mediaItemFor).toList(growable: false);
@@ -48,16 +88,28 @@ class MusicAudioHandler extends BaseAudioHandler
       queue.add(items);
     }
     mediaItem.add(currentItem);
+    final Duration? resolvedDuration;
     if (url.startsWith('http://') || url.startsWith('https://')) {
-      await audioPlayer.setUrl(url);
+      resolvedDuration = await audioPlayer.setUrl(url);
     } else {
-      await audioPlayer.setAudioSource(AudioSource.file(url));
+      resolvedDuration = await audioPlayer.setAudioSource(
+        AudioSource.file(url),
+      );
+    }
+    // Some providers omit duration from their song payload. just_audio learns
+    // it while preparing the source; publish that value so external media
+    // browsers (including vivo MusicWidgetMix) can render time and seek state.
+    if ((song.duration == null || song.duration == Duration.zero) &&
+        resolvedDuration != null &&
+        resolvedDuration > Duration.zero) {
+      _resolvedDuration = resolvedDuration;
+      mediaItem.add(_mediaItemFor(song));
     }
   }
 
   @override
-  Future<void> updateQueue(List<MediaItem> newQueue) async {
-    queue.add(newQueue);
+  Future<void> updateQueue(List<MediaItem> queue) async {
+    this.queue.add(queue);
   }
 
   Future<void> setSongQueue({
@@ -66,6 +118,7 @@ class MusicAudioHandler extends BaseAudioHandler
     Song? currentSong,
   }) async {
     if (currentSong != null) _currentSong = currentSong;
+    _queueSongs = List<Song>.of(queueSongs);
     _queueIndex = queueIndex < 0 ? 0 : queueIndex;
     queue.add(queueSongs.map(_mediaItemFor).toList(growable: false));
     if (currentSong != null) {
@@ -90,6 +143,8 @@ class MusicAudioHandler extends BaseAudioHandler
     final Map<String, dynamic> extras = {
       'hash': song.hash,
       'songId': song.id,
+      'vivomusicmix.media.metadata.support_event': _vivoSupportEvents,
+      'vivomusicmix.media.metadata.LOOP_MODE': _getLoopMode?.call() ?? 1,
       'lyric': ?lyricText,
       'currentLyric': ?lyricText,
       'translationLyric': ?translationText,
@@ -100,8 +155,10 @@ class MusicAudioHandler extends BaseAudioHandler
       album: song.albumName,
       title: song.title,
       artist: song.artist,
-      duration: song.duration,
+      duration: _durationFor(song),
       artUri: song.coverUrl == null ? null : Uri.tryParse(song.coverUrl!),
+      playable: true,
+      rating: Rating.newHeartRating(_isLiked?.call(song) ?? false),
       extras: extras,
     );
     mediaItem.add(updated);
@@ -133,6 +190,107 @@ class MusicAudioHandler extends BaseAudioHandler
   }
 
   @override
+  Future<void> playFromMediaId(
+    String mediaId, [
+    Map<String, dynamic>? extras,
+  ]) async {
+    for (final song in _queueSongs) {
+      if (_songId(song) == mediaId) {
+        await _onPlaySong?.call(song, _queueSongs);
+        return;
+      }
+    }
+    final browseQueue = _vivoBrowseQueues[mediaId];
+    if (browseQueue == null) return;
+    for (final song in browseQueue) {
+      if (_songId(song) == mediaId) {
+        await _onPlaySong?.call(song, browseQueue);
+        return;
+      }
+    }
+  }
+
+  @override
+  Future<void> setRating(Rating rating, [Map<String, dynamic>? extras]) async {
+    final song = _currentSong;
+    if (song == null || rating.getRatingStyle() != RatingStyle.heart) return;
+    final currentlyLiked = _isLiked?.call(song) ?? false;
+    if (rating.hasHeart() != currentlyLiked) {
+      await _onSetLike?.call(song, rating.hasHeart());
+    }
+    refreshVivoMetadata();
+  }
+
+  @override
+  Future<dynamic> customAction(
+    String name, [
+    Map<String, dynamic>? extras,
+  ]) async {
+    if (name == 'vivomusicmix.media.action.PLAY_MODE') {
+      final mode = (extras?['vivomusicmix.media.metadata.LOOP_MODE'] as num?)
+          ?.toInt();
+      if (mode != null && mode >= 1 && mode <= 3) {
+        _onSetLoopMode?.call(mode);
+        refreshVivoMetadata();
+      }
+      return null;
+    }
+    return super.customAction(name, extras);
+  }
+
+  @override
+  Future<List<MediaItem>> getChildren(
+    String parentMediaId, [
+    Map<String, dynamic>? options,
+  ]) async {
+    const pageSize = 50;
+    final page =
+        (options?['vivomusicmix_key_media_page'] as num?)?.toInt() ?? 0;
+    List<Song> songs;
+    switch (parentMediaId) {
+      case 'vivomusicmix_current_list':
+        songs = _queueSongs
+            .skip(page * pageSize)
+            .take(pageSize)
+            .toList(growable: false);
+        break;
+      case 'vivomusicmix_favorite_list':
+        songs = await _getFavoriteSongs?.call(page, pageSize) ?? const [];
+        break;
+      case 'vivomusicmix_local_list':
+        songs = (_getDownloadedSongs?.call() ?? const [])
+            .skip(page * pageSize)
+            .take(pageSize)
+            .toList(growable: false);
+        break;
+      default:
+        return const [];
+    }
+    for (final song in songs) {
+      _vivoBrowseQueues[_songId(song)] = songs;
+    }
+    return List<MediaItem>.generate(
+      songs.length,
+      (index) => _mediaItemFor(
+        songs[index],
+        vivoPage: index == songs.length - 1 ? page + 1 : null,
+        vivoHasMore: index == songs.length - 1
+            ? songs.length == pageSize
+            : null,
+      ),
+      growable: false,
+    );
+  }
+
+  void refreshVivoMetadata() {
+    final song = _currentSong;
+    if (song != null) mediaItem.add(_mediaItemFor(song));
+    if (_queueSongs.isNotEmpty) {
+      queue.add(_queueSongs.map(_mediaItemFor).toList(growable: false));
+    }
+  }
+
+  @override
   Future<void> stop() async {
     await audioPlayer.stop();
   }
@@ -141,15 +299,31 @@ class MusicAudioHandler extends BaseAudioHandler
     await audioPlayer.dispose();
   }
 
-  MediaItem _mediaItemFor(Song song) {
+  String _songId(Song song) => song.hash.isEmpty ? song.id : song.hash;
+
+  Duration? _durationFor(Song song) => identical(song, _currentSong)
+      ? (_resolvedDuration ?? song.duration)
+      : song.duration;
+
+  MediaItem _mediaItemFor(Song song, {int? vivoPage, bool? vivoHasMore}) {
     return MediaItem(
-      id: song.hash.isEmpty ? song.id : song.hash,
+      id: _songId(song),
       album: song.albumName,
       title: song.title,
       artist: song.artist,
-      duration: song.duration,
+      duration: _durationFor(song),
       artUri: song.coverUrl == null ? null : Uri.tryParse(song.coverUrl!),
-      extras: {'hash': song.hash, 'songId': song.id},
+      playable: true,
+      rating: Rating.newHeartRating(_isLiked?.call(song) ?? false),
+      extras: {
+        'hash': song.hash,
+        'songId': song.id,
+        // Bit mask used by vivo MusicWidgetMix: transport, progress and lists.
+        'vivomusicmix.media.metadata.support_event': _vivoSupportEvents,
+        'vivomusicmix.media.metadata.LOOP_MODE': _getLoopMode?.call() ?? 1,
+        if (vivoPage != null) 'vivomusicmix_key_media_page': vivoPage,
+        if (vivoHasMore != null) 'vivomusicmix_key_has_more': vivoHasMore,
+      },
     );
   }
 
