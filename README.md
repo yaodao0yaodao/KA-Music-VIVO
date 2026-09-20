@@ -1,7 +1,3 @@
-
-
-https://github.com/user-attachments/assets/48a9cb16-4616-4649-b379-385e48882e68
-
 <p align="center">
   <img src="lib/assets/logo.png" alt="KA Music Logo" width="120" height="120" />
 </p>
@@ -46,13 +42,11 @@ KA Music 是一个功能丰富的 **第三方音乐播放器**，使用 Flutter 
 
 ## 功能截图
 
+<p align="center"><strong>原子随身听</strong></p>
+
+https://github.com/user-attachments/assets/48a9cb16-4616-4649-b379-385e48882e68
+
 <p align="center">
-  <a href="output/pdf/atomic_listen_storyboard.pdf">
-    <img src="screenshots/atomic_listen.jpg" alt="原子随身听（点击查看 PDF）" width="260" />
-  </a>
-  <br />
-  <strong>原子随身听</strong>
-  <br />
   <a href="output/pdf/atomic_listen_storyboard.pdf">查看完整功能 PDF（9页）</a>
   ·
   <a href="screenshots/video_20260920_165848.mp4">原始录屏（MP4）</a>
