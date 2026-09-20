@@ -42,6 +42,16 @@ KA Music 是一个功能丰富的 **第三方音乐播放器**，使用 Flutter 
 
 ## 功能截图
 
+<table>
+  <tr>
+    <td colspan="3" align="center">
+      <img src="screenshots/atomic_listen.jpg" alt="原子随身听" width="260" />
+      <br />
+      <strong>原子随身听</strong>
+    </td>
+  </tr>
+</table>
+
 | 首页推荐 | 播放器 | 歌词 |
 |:-------:|:------:|:----:|
 | ![首页](screenshots/home.jpg) | ![播放器](screenshots/player.jpg) | ![歌词](screenshots/lrc.jpg) |
