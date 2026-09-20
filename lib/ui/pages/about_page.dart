@@ -15,7 +15,7 @@ class AboutPage extends StatefulWidget {
   const AboutPage({super.key, required this.api});
 
   static final Uri _repositoryUri = Uri.parse(
-    'https://github.com/yaodao0yaodao/kgka_Music_hl',
+    'https://github.com/yaodao0yaodao/KA-Music-VIVO',
   );
   static final Uri _upstreamUri = Uri.parse(
     'https://github.com/umr-xiaomai/kgka_Music_hl',
@@ -159,7 +159,7 @@ class _AboutPageState extends State<AboutPage> {
                       ),
                       _InfoLinkRow(
                         label: '维护仓库',
-                        value: 'yaodao0yaodao/kgka_Music_hl (vivo)',
+                        value: 'yaodao0yaodao/KA-Music-VIVO',
                         onTap: () => _openUri(AboutPage._repositoryUri),
                       ),
                       _InfoLinkRow(

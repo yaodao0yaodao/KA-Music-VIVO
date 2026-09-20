@@ -2,12 +2,12 @@
   <img src="lib/assets/logo.png" alt="KA Music Logo" width="120" height="120" />
 </p>
 
-<h1 align="center">KA Music</h1>
+<h1 align="center">KA Music VIVO</h1>
 
 <p align="center">
-  <strong>一个精致的第三方音乐客户端</strong>
+  <strong>面向 VIVO OriginOS 原子随身听适配的第三方音乐客户端</strong>
   <br />
-  基于 Flutter 构建 · 支持多平台 · Material You 设计
+  基于 Flutter 构建 · 自动跟随上游版本 · Material You 设计
 </p>
 
 <p align="center">
