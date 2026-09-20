@@ -43,13 +43,15 @@ KA Music 是一个功能丰富的 **第三方音乐播放器**，使用 Flutter 
 ## 功能截图
 
 <p align="center">
-  <a href="https://raw.githubusercontent.com/yaodao0yaodao/KA-Music-VIVO/vivo/screenshots/video_20260920_165848.mp4">
-    <img src="screenshots/atomic_listen.jpg" alt="原子随身听（点击播放视频）" width="260" />
+  <a href="output/pdf/atomic_listen_storyboard.pdf">
+    <img src="screenshots/atomic_listen.jpg" alt="原子随身听（点击查看 PDF）" width="260" />
   </a>
   <br />
   <strong>原子随身听</strong>
   <br />
-  <a href="https://raw.githubusercontent.com/yaodao0yaodao/KA-Music-VIVO/vivo/screenshots/video_20260920_165848.mp4">▶ 播放完整录屏（MP4）</a>
+  <a href="output/pdf/atomic_listen_storyboard.pdf">查看完整功能 PDF（9页）</a>
+  ·
+  <a href="screenshots/video_20260920_165848.mp4">原始录屏（MP4）</a>
 </p>
 
 | 首页推荐 | 播放器 | 歌词 |
